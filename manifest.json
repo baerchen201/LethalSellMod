@@ -1,0 +1,7 @@
+{
+  "name": "YetAnotherSellMod",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/baerchen201/LethalSellMod",
+  "description": "man i love selling",
+  "dependencies": ["baer1-ChatCommandAPI-0.1.3"]
+}
