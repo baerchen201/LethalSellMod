@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
@@ -81,12 +82,18 @@ public class SellCommand : Command
                 {
                     case "quota":
                         value = TimeOfDay.Instance.profitQuota - TimeOfDay.Instance.quotaFulfilled;
+                        error = "Quota is already fulfilled";
+                        if (value < 1)
+                            return false;
                         break;
                     case "all":
                         value = null;
                         break;
                     default:
                         if (!int.TryParse(args[0], out var _value))
+                            return false;
+                        error = "Value must be a positive integer";
+                        if (_value < 1)
                             return false;
                         value = _value;
                         break;
@@ -99,6 +106,9 @@ public class SellCommand : Command
                 error = "No items found";
                 var items = ItemsForValue(value, desk);
                 if (items == null)
+                    return false;
+                error = "You can't afford to sell that amount";
+                if (items.Count == 0)
                     return false;
 
                 error = "Error selling items";
@@ -144,48 +154,217 @@ public class SellCommand : Command
 
     private static List<GrabbableObject>? ItemsForValue(int? value, DepositItemsDesk desk)
     {
-        var items = Object.FindObjectsOfType<GrabbableObject>();
-        if (items == null || items.Length == 0)
-            return null;
+        LethalSellMod.Logger.LogDebug(
+            $">> ItemsForValue({(value == null ? "null" : value)}, {desk})"
+        );
 
-        items = FilterAndSortItems(items, desk);
-        if (items.Length == 0)
-            return null;
-        if (items.Length == 1 || value == null)
-            return items.ToList();
-        value = (int)Math.Ceiling((double)(value / StartOfRound.Instance.companyBuyingRate));
-
-        int n = items.Length;
-        int bestDiff = int.MinValue;
-        List<GrabbableObject> bestSubset = [];
-
-        for (int i = 0; i < 1 << n; i++)
+        if (value is 0)
         {
-            List<GrabbableObject> subset = [];
-            int sum = 0;
-
-            for (int j = 0; j < n; j++)
-            {
-                if ((i & (1 << j)) == 0)
-                    continue;
-                subset.Add(items[j]);
-                sum += items[j].scrapValue;
-            }
-
-            int diff = value.Value - sum;
-            if (diff <= bestDiff || diff > 0)
-                continue;
-            LethalSellMod.Logger.LogDebug(
-                $"Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}match: {subset.Count} items for {sum} value ({value.Value} requested, diff:{diff}, bestDiff:{bestDiff})"
-            );
-            if (diff == 0)
-                return subset;
-            bestDiff = diff;
-            bestSubset = subset;
+            LethalSellMod.Logger.LogDebug("<< ItemsForValue -> null (no value)");
+            return null;
         }
 
+        var items = Object.FindObjectsOfType<GrabbableObject>();
+        LethalSellMod.Logger.LogDebug(
+            $"   max value: {items.Sum(i => i.scrapValue)} items:{c(items)}"
+        );
+        if (items == null || items.Length == 0)
+        {
+            LethalSellMod.Logger.LogDebug(
+                $"<< ItemsForValue -> null (items is empty) items:{c(items)}"
+            );
+            return null;
+        }
+
+        items = FilterAndSortItems(items, desk);
+        LethalSellMod.Logger.LogDebug(
+            $"   post-filter max value: {items.Sum(i => i.scrapValue)} items:{c(items)}"
+        );
+        if (items.Length == 0)
+        {
+            LethalSellMod.Logger.LogDebug(
+                $"<< ItemsForValue -> null (filtered items is empty) items:{c(items)}"
+            );
+            return null;
+        }
+        if (value == null)
+        {
+            LethalSellMod.Logger.LogDebug(
+                $"<< ItemsForValue -> {c(items)} (no calculations required > all)"
+            );
+            return items.ToList();
+        }
+        if (items.Length == 1 && items[0].scrapValue >= value)
+        {
+            LethalSellMod.Logger.LogDebug(
+                $"<< ItemsForValue -> {c(items)} (no calculations required > 1 item)"
+            );
+            return items.ToList();
+        }
+        value = (int)Math.Ceiling((double)(value / StartOfRound.Instance.companyBuyingRate));
+
+        List<GrabbableObject> bestSubset = [];
+
+        LethalSellMod.Logger.LogDebug(
+            SmartCalculation(items, value.Value, ref bestSubset)
+                ? $"<< ItemsForValue -> {c(bestSubset)} (found best match)"
+                : $"<< ItemsForValue -> {c(bestSubset)}"
+        );
         return bestSubset;
     }
+
+    private static bool OldCalculation(
+        GrabbableObject[] items,
+        int value,
+        ref List<GrabbableObject> bestSubset
+    )
+    {
+        int bestDiff = int.MinValue;
+
+        for (int i = 1; i < 1 << items.Length; i++)
+        {
+            int sum = items.Where((_, j) => (i & (1 << j)) != 0).Sum(t => t.scrapValue);
+
+            int diff = value - sum;
+            if (diff > 0 || diff <= bestDiff)
+                continue;
+            bestSubset = [];
+            bestSubset.AddRange(items.Where((_, j) => (i & (1 << j)) != 0));
+            LethalSellMod.Logger.LogDebug(
+                $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}match: {bestSubset.Count} items for {sum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
+            );
+            if (diff == 0)
+            {
+                return true;
+            }
+            bestDiff = diff;
+        }
+
+        return false;
+    }
+
+    private static bool ExactCalculation(
+        GrabbableObject[] items,
+        int value,
+        ref List<GrabbableObject> bestSubset
+    )
+    {
+        int bestDiff = int.MinValue;
+
+        for (int i = 1; i < (int)Math.Pow(2, items.Length); i++)
+        {
+            int sum = items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0).Sum(t => t.scrapValue);
+
+            int diff = value - sum;
+            if (diff > 0 || diff <= bestDiff)
+                continue;
+            bestSubset = [];
+            bestSubset.AddRange(items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0));
+            LethalSellMod.Logger.LogDebug(
+                $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}match: {bestSubset.Count} items for {sum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
+            );
+            if (diff == 0)
+            {
+                return true;
+            }
+            bestDiff = diff;
+        }
+
+        return false;
+    }
+
+    private static bool SmartCalculation(
+        GrabbableObject[] items,
+        int value,
+        // ReSharper disable once RedundantAssignment
+        ref List<GrabbableObject> bestSubset
+    )
+    {
+        items = items.OrderByDescending(i => i.scrapValue).ToArray();
+
+        int bestDiff = int.MinValue;
+        int baseSum = 0;
+        List<int> baseItems = [];
+
+        while (baseSum <= value - 50)
+        {
+            bool _continue = false;
+            for (int i = 0; i < items.Length; i++)
+                if (
+                    !baseItems.Contains(i)
+                    && (
+                        baseSum + items[i].scrapValue <= Math.Max(value - 50, 0)
+                        || baseSum + items[i].scrapValue == value
+                    )
+                )
+                {
+                    baseSum += items[i].scrapValue;
+                    int diff = value - 50 - baseSum;
+                    baseItems.Add(i);
+                    LethalSellMod.Logger.LogDebug(
+                        $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}base match: {baseItems.Count} items for {baseSum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
+                    );
+                    bestDiff = diff;
+                    _continue = true;
+                    break;
+                }
+
+            if (_continue)
+                continue;
+            break;
+        }
+
+        int missingValue = value - baseSum;
+        bestDiff = -missingValue;
+        var baseSubset = baseItems.Select(i => items[i]).ToList();
+        bestSubset = baseSubset;
+        items = items.Where((_, i) => !baseItems.Contains(i)).ToArray();
+        LethalSellMod.Logger.LogDebug(
+            $"   Finished base calculation ({baseItems.Count} items for {baseSum} value, missing {missingValue} value, got {items.Length} items to work with)"
+        );
+
+        if (missingValue == 0)
+            return true;
+
+        if (items.Length == 0)
+        {
+            if (missingValue > 0)
+                bestSubset = [];
+            return false;
+        }
+        for (int i = 0; i < (int)Math.Pow(2, items.Length); i++)
+        {
+            int sum = items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0).Sum(t => t.scrapValue);
+
+            int diff = missingValue - sum;
+            if (diff > 0 || diff <= bestDiff)
+                continue;
+            bestSubset = [];
+            bestSubset.AddRange(items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0));
+            LethalSellMod.Logger.LogDebug(
+                $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}match: {bestSubset.Count + baseItems.Count} items for {sum + baseSum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
+            );
+            if (diff == 0)
+            {
+                bestSubset.AddRange(baseSubset);
+                return true;
+            }
+            bestDiff = diff;
+        }
+
+        if (bestDiff > 0)
+        {
+            bestSubset = [];
+            return false;
+        }
+        bestSubset.AddRange(baseSubset);
+        return false;
+    }
+
+    private static string c(IList? list) =>
+        list == null
+            ? "null"
+            : $"{list.GetType().Name}{(list.GetType().GetGenericArguments().Length == 0 ? "" : $"<{list.GetType().GetGenericArguments().Join()}>")}[{list.Count}]";
 
     private static bool SellItems(
         List<GrabbableObject> items,
