@@ -164,7 +164,7 @@ public class SellCommand : Command
             return null;
         }
 
-        items = FilterAndSortItems(items, desk);
+        items = FilterItems(items, desk);
         LethalSellMod.Logger.LogDebug(
             $"   post-filter max value: {items.Sum(i => i.scrapValue)} items:{c(items)}"
         );
@@ -348,10 +348,7 @@ public class SellCommand : Command
     public static string RemoveClone(string name) =>
         name.EndsWith(CLONE) ? name[..^CLONE.Length] : name;
 
-    private static GrabbableObject[] FilterAndSortItems(
-        GrabbableObject[] items,
-        DepositItemsDesk desk
-    )
+    private static GrabbableObject[] FilterItems(GrabbableObject[] items, DepositItemsDesk desk)
     {
         return items
             .Where(i =>
