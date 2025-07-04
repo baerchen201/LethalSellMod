@@ -22,8 +22,6 @@ public class LethalSellMod : BaseUnityPlugin
 
     private ConfigEntry<string> itemBlacklist = null!;
     internal string[] ItemBlacklist => csv(itemBlacklist.Value);
-    private ConfigEntry<string> itemPriority = null!;
-    internal Dictionary<string, int> ItemPriority = null!;
 
     private void Awake()
     {
@@ -36,16 +34,6 @@ public class LethalSellMod : BaseUnityPlugin
             csv(["ShotgunItem"]),
             "Items to never sell by internal name (comma-separated)"
         );
-        itemPriority = Config.Bind(
-            "Items",
-            "ItemPriority",
-            csv([]),
-            "Items to sell before others (by internal name, comma-separated)"
-        );
-        ItemPriority = csv(itemPriority.Value)
-            .Select((e, i) => new KeyValuePair<string, int>(e, i))
-            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
         _ = new SellCommand();
 
         Logger.LogInfo($"{MyPluginInfo.PLUGIN_GUID} v{MyPluginInfo.PLUGIN_VERSION} has loaded!");
@@ -213,66 +201,6 @@ public class SellCommand : Command
         return bestSubset;
     }
 
-    private static bool OldCalculation(
-        GrabbableObject[] items,
-        int value,
-        ref List<GrabbableObject> bestSubset
-    )
-    {
-        int bestDiff = int.MinValue;
-
-        for (int i = 1; i < 1 << items.Length; i++)
-        {
-            int sum = items.Where((_, j) => (i & (1 << j)) != 0).Sum(t => t.scrapValue);
-
-            int diff = value - sum;
-            if (diff > 0 || diff <= bestDiff)
-                continue;
-            bestSubset = [];
-            bestSubset.AddRange(items.Where((_, j) => (i & (1 << j)) != 0));
-            LethalSellMod.Logger.LogDebug(
-                $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}match: {bestSubset.Count} items for {sum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
-            );
-            if (diff == 0)
-            {
-                return true;
-            }
-            bestDiff = diff;
-        }
-
-        return false;
-    }
-
-    private static bool ExactCalculation(
-        GrabbableObject[] items,
-        int value,
-        ref List<GrabbableObject> bestSubset
-    )
-    {
-        int bestDiff = int.MinValue;
-
-        for (int i = 1; i < (int)Math.Pow(2, items.Length); i++)
-        {
-            int sum = items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0).Sum(t => t.scrapValue);
-
-            int diff = value - sum;
-            if (diff > 0 || diff <= bestDiff)
-                continue;
-            bestSubset = [];
-            bestSubset.AddRange(items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0));
-            LethalSellMod.Logger.LogDebug(
-                $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}match: {bestSubset.Count} items for {sum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
-            );
-            if (diff == 0)
-            {
-                return true;
-            }
-            bestDiff = diff;
-        }
-
-        return false;
-    }
-
     private static bool SmartCalculation(
         GrabbableObject[] items,
         int value,
@@ -437,12 +365,6 @@ public class SellCommand : Command
                 && !desk.itemsOnCounter.Contains(i)
             )
             .Where(i => !LethalSellMod.Instance.ItemBlacklist.Contains(RemoveClone(i.name)))
-            .OrderBy(i =>
-                LethalSellMod.Instance.ItemPriority.GetValueOrDefault(
-                    RemoveClone(i.name),
-                    int.MaxValue
-                )
-            )
             .ToArray();
     }
 
