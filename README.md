@@ -22,12 +22,10 @@ making noise near the sell desk.
 
 `/sell all` will sell all items.
 
-This automatically opens the sell door, you don't need to manually make noise.
-
 ## Reporting issues (bugs, annoyances, feature requests)
 
 Please report any issues and bugs on [GitHub](https://github.com/baerchen201/LethalSellMod/issues). Before submitting a new issue, please check if it has already been reported.
 
 ### Contributing
 
-This mod is open-source. If would like to contribute, you can [open a pull request](https://github.com/baerchen201/LethalSellMod/pulls).
+This mod is open-source. If you would like to contribute, you can [open a pull request](https://github.com/baerchen201/LethalSellMod/pulls).
