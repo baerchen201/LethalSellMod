@@ -1,7 +1,7 @@
 ## Usage:
 
-- /sell [value]
-- /sell { quota | all }
+- `/sell [value]`
+- `/sell { quota | all }`
 
 ### Selling a specific value
 
