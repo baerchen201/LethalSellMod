@@ -88,7 +88,7 @@ public class SellCommand : Command
                 }
 
                 error = "Selling desk not found";
-                DepositItemsDesk desk = Object.FindObjectOfType<DepositItemsDesk>();
+                var desk = Object.FindObjectOfType<DepositItemsDesk>();
                 if (GameNetworkManager.Instance == null || desk == null)
                     return false;
                 error = "No items found";
@@ -200,14 +200,14 @@ public class SellCommand : Command
     {
         items = items.OrderByDescending(i => i.scrapValue).ToArray();
 
-        int bestDiff = int.MinValue;
-        int baseSum = 0;
+        var bestDiff = int.MinValue;
+        var baseSum = 0;
         List<int> baseItems = [];
 
         while (baseSum <= value - 50)
         {
-            bool _continue = false;
-            for (int i = 0; i < items.Length; i++)
+            var _continue = false;
+            for (var i = 0; i < items.Length; i++)
                 if (
                     !baseItems.Contains(i)
                     && (
@@ -217,7 +217,7 @@ public class SellCommand : Command
                 )
                 {
                     baseSum += items[i].scrapValue;
-                    int diff = value - 50 - baseSum;
+                    var diff = value - 50 - baseSum;
                     baseItems.Add(i);
                     LethalSellMod.Logger.LogDebug(
                         $"   Found {(bestDiff == int.MinValue ? "" : diff == 0 ? "best " : "better ")}base match: {baseItems.Count} items for {baseSum} value ({value} requested, diff:{diff}, bestDiff:{bestDiff})"
@@ -232,7 +232,7 @@ public class SellCommand : Command
             break;
         }
 
-        int missingValue = value - baseSum;
+        var missingValue = value - baseSum;
         bestDiff = -missingValue;
         var baseSubset = baseItems.Select(i => items[i]).ToList();
         bestSubset = baseSubset;
@@ -250,11 +250,11 @@ public class SellCommand : Command
                 bestSubset = [];
             return false;
         }
-        for (int i = 0; i < (int)Math.Pow(2, items.Length); i++)
+        for (var i = 0; i < (int)Math.Pow(2, items.Length); i++)
         {
-            int sum = items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0).Sum(t => t.scrapValue);
+            var sum = items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0).Sum(t => t.scrapValue);
 
-            int diff = missingValue - sum;
+            var diff = missingValue - sum;
             if (diff > 0 || diff <= bestDiff)
                 continue;
             bestSubset = [];
@@ -298,7 +298,7 @@ public class SellCommand : Command
                 continue;
             itemCount++;
 
-            Vector3 vector = RoundManager.RandomPointInBounds(desk.triggerCollider.bounds);
+            var vector = RoundManager.RandomPointInBounds(desk.triggerCollider.bounds);
             vector.y = desk.triggerCollider.bounds.min.y;
             if (
                 Physics.Raycast(
@@ -360,7 +360,7 @@ public class SellCommand : Command
         itemCount = 0;
         totalValue = 0;
         error = "Selling desk not found";
-        DepositItemsDesk desk = Object.FindObjectOfType<DepositItemsDesk>();
+        var desk = Object.FindObjectOfType<DepositItemsDesk>();
         if (GameNetworkManager.Instance == null || desk == null)
             return false;
         itemCount = desk.itemsOnCounter.Count;
