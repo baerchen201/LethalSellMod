@@ -53,12 +53,11 @@ public class SellCommand : Command
     public override bool Invoke(string[] args, Dictionary<string, string> kwargs, out string error)
     {
         error = "Invalid arguments";
-        int itemCount,
-            totalValue;
+        int itemCount;
         switch (args.Length)
         {
             case 0:
-                if (!OpenDoor(out error, out itemCount, out totalValue))
+                if (!OpenDoor(out error, out itemCount, out var totalValue))
                     return false;
                 ChatCommandAPI.ChatCommandAPI.Print(
                     $"Selling {a(itemCount)} with a total value of {b(totalValue)}"
@@ -165,6 +164,7 @@ public class SellCommand : Command
             );
             return null;
         }
+
         if (value == null)
         {
             LethalSellMod.Logger.LogDebug(
@@ -172,6 +172,7 @@ public class SellCommand : Command
             );
             return items.ToList();
         }
+
         if (items.Length == 1 && items[0].scrapValue >= value)
         {
             LethalSellMod.Logger.LogDebug(
@@ -179,6 +180,7 @@ public class SellCommand : Command
             );
             return items.ToList();
         }
+
         value = (int)Math.Ceiling((double)(value / StartOfRound.Instance.companyBuyingRate));
 
         List<GrabbableObject> bestSubset = [];
@@ -250,6 +252,7 @@ public class SellCommand : Command
                 bestSubset = [];
             return false;
         }
+
         for (var i = 0; i < (int)Math.Pow(2, items.Length); i++)
         {
             var sum = items.Where((_, j) => (i & (int)Math.Pow(2, j)) != 0).Sum(t => t.scrapValue);
@@ -267,6 +270,7 @@ public class SellCommand : Command
                 bestSubset.AddRange(baseSubset);
                 return true;
             }
+
             bestDiff = diff;
         }
 
@@ -275,6 +279,7 @@ public class SellCommand : Command
             bestSubset = [];
             return false;
         }
+
         bestSubset.AddRange(baseSubset);
         return false;
     }
@@ -312,6 +317,7 @@ public class SellCommand : Command
             {
                 vector = hitInfo.point;
             }
+
             vector.y += i.itemProperties.verticalOffset;
             vector = desk.deskObjectsContainer.transform.InverseTransformPoint(vector);
 
