@@ -102,20 +102,10 @@ public class SellCommand : Command
                 error = "Error selling items";
                 if (!SellItems(items, desk, out itemCount))
                     return false;
-                if (!desk.doorOpen && value == null)
-                {
-                    if (!OpenDoor(out _, out itemCount, out totalValue))
-                        return false;
-                    ChatCommandAPI.ChatCommandAPI.Print(
-                        $"Selling {a(itemCount)} with a total value of {b(totalValue)}"
-                    );
-                }
-                else
-                {
-                    ChatCommandAPI.ChatCommandAPI.Print(
-                        $"Put {a(itemCount)} worth {b(items)} on the desk"
-                    );
-                }
+
+                ChatCommandAPI.ChatCommandAPI.Print(
+                    $"Put {a(itemCount)} worth {b(items)} on the desk"
+                );
                 return true;
             default:
                 return false;
